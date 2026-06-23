@@ -322,7 +322,7 @@ const $=id=>document.getElementById(id);
 const V=id=>($(id)?.value||'').trim();
 const esc=s=>(s||'').replace(/</g,'&lt;');
 function showToast(msg,dur=2500){const t=$('toast-el');t.textContent=msg;t.style.opacity='1';clearTimeout(t._tmr);t._tmr=setTimeout(()=>t.style.opacity='0',dur);}
-const AI_BREVITY='답변 규칙: 1. 핵심 위주 간략 답변 (서술형 금지) 2. 텍스트 형태로 작성 3. 가독성 좋게 표현 4. #,*,-,가나다 순서 기호 금지, 항목은 1.2.3.4. 숫자 순으로, 항목 사이 과도한 줄바꿈 없이 작성 5. 시작한 문장과 항목은 반드시 끝까지 완결, 중간에 잘리지 않도록 분량 스스로 조절.';
+const AI_BREVITY='[답변 필수 규칙] 마크다운 절대 금지(#, ##, **, *, |, ---, 표, 코드블록 등 일체 사용 금지). 반드시 일반 텍스트로만 작성. 항목은 1. 2. 3. 숫자 순서로, 항목 사이 빈 줄 없이 작성. 핵심 위주 간결하게. 시작한 문장은 반드시 끝까지 완결.';
 async function callAI(sys,usr,max=1000,allowCont=false){
  const msgs=Array.isArray(usr)?usr.slice():[{role:'user',content:usr}];
  const maxRounds=(allowCont&&S.aiSettings&&S.aiSettings.autocont)?3:1;
