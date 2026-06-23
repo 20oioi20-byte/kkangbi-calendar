@@ -322,22 +322,64 @@ const $=id=>document.getElementById(id);
 const V=id=>($(id)?.value||'').trim();
 const esc=s=>(s||'').replace(/</g,'&lt;');
 function showToast(msg,dur=2500){const t=$('toast-el');t.textContent=msg;t.style.opacity='1';clearTimeout(t._tmr);t._tmr=setTimeout(()=>t.style.opacity='0',dur);}
-const AI_BREVITY='핵심 위주 간결하게. 항목은 1. 2. 3. 숫자 순서로. 시작한 문장은 반드시 끝까지 완결.';
-function md2html(s){
-  if(!s)return '';
-  s=s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  s=s.replace(/^[^\n]*\|[^\n]*$/gm,'');
-  s=s.replace(/^---+$/gm,'');
-  s=s.replace(/^#{1,6} (.+)$/gm,'<b>$1</b>');
-  s=s.replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>');
-  s=s.replace(/\*([^*\n]+)\*/g,'$1');
-  s=s.replace(/\n/g,'<br>');
-  s=s.replace(/(<br>){2,}/g,'<br>');
-  s=s.replace(/^<br>/,'');
-  return s;
+const AI_BREVITY='[답변 필수 규칙] 마크다운 절대 금지(#, ##, **, *, |, ---, 표, 코드블록 등 일체 사용 금지). 반드시 일반 텍스트로만 작성. 항목은 1. 2. 3. 숫자 순서로, 항목 사이 빈 줄 없이 작성. 핵심 위주 간결하게. 시작한 문장은 반드시 끝까지 완결.';
+async function callAI(sys,usr,max=1000,allowCont=false){
+ const msgs=Array.isArray(usr)?usr.slice():[{role:'user',content:usr}];
+ const maxRounds=(allowCont&&S.aiSettings&&S.aiSettings.autocont)?3:1;
+ let full='';
+ for(let i=0;i<maxRounds;i++){
+  const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system:sys,messages:msgs,max_tokens:max})});
+  const d=await r.json();
+  const part=d.text||'';
+  full+=part;
+  if(!d.continued||!part)break;
+  msgs.push({role:'assistant',content:part});
+  msgs.push({role:'user',content:'중복 없이, 직전에 끊긴 지점에 바로 이어서 계속 작성해줘.'});
+ }
+ return full;
 }
-
-
+function aiCutoff(){const s=S.aiSettings;if(!s||s.mode!=='period')return'';const d=new Date();d.setMonth(d.getMonth()-(s.months||3));return fmtDate(d);}
+function aiScopeArr(arr,getD){const s=S.aiSettings||{mode:'period',months:3,count:50};const a=[...(arr||[])].sort((x,y)=>(getD(x)||'').localeCompare(getD(y)||''));if(s.mode==='all')return a;if(s.mode==='count')return a.slice(-(s.count||50));const cut=aiCutoff();return a.filter(x=>(getD(x)||'')>=cut);}
+function aiScopeLabel(){const s=S.aiSettings||{mode:'period',months:3,count:50};return s.mode==='all'?'전체':s.mode==='count'?`최근 ${s.count||50}개`:`최근 ${s.months||3}개월`;}
+function buildAICtx(){
+ const today=fmtDate(new Date());
+ const evs=aiScopeArr(S.events,e=>e.date);
+ const evTxt=evs.map(e=>`${e.date} ${e.time?e.time+' ':''}${e.title}(${e.status==='done'?'완료':e.status==='delayed'?'연기':'진행'})${e.important?' ⭐중요':''}${e.memo?` [메모:${e.memo.slice(0,60)}]`:''}`).join('\n');
+ const dr=aiScopeArr(S.dailyReports,r=>r.date);
+ const wr=aiScopeArr(S.weeklyReports,r=>(r.week||'').slice(0,10)||r.createdAt||'');
+ const mm=aiScopeArr(S.memos,m=>m.date);
+ const histTxt=S.clients.map(c=>`[${c.name}] ${aiScopeArr(c.history||[],h=>h.date).slice(-10).map(x=>`(${x.date}) ${x.text.slice(0,120)}`).join(' / ')||'기록 없음'}`).join('\n');
+ return `오늘 날짜: ${today} (참조범위: ${aiScopeLabel()})
+■ 전체 일정 (${evs.length}건, 날짜순):
+${evTxt||'없음'}
+■ 고객사 히스토리(이슈/운영기록):
+${histTxt}
+■ 일일보고 (${dr.length}건):
+${dr.map(r=>`[${r.date}] ${(r.content||'').slice(0,250)}`).join('\n')||'없음'}
+■ 주간보고 (${wr.length}건):
+${wr.map(r=>`[${r.week}] ${(r.content||'').slice(0,250)}`).join('\n')||'없음'}
+■ 메모 (${mm.length}건): ${mm.map(m=>(m.text||'').slice(0,80)).join(' / ')||'없음'}`;
+}
+function openAISettings(){
+ const s=S.aiSettings||{mode:'period',months:3,count:50,autocont:true};
+ modal('⚙️ AI 참조 설정',
+ `<div style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.5">AI 채팅 · 보고 분석 · 플로팅 어시스턴트가 참조할 데이터(일정·일일/주간보고·메모·고객사 히스토리)의 범위를 정합니다.</div>
+<label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">참조 방식</label>
+<select id="ai-mode" onchange="aiSettingsToggle()" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:11px">
+<option value="period"${s.mode==='period'?' selected':''}>기간으로 (최근 N개월)</option>
+<option value="count"${s.mode==='count'?' selected':''}>개수로 (최근 N개)</option>
+<option value="all"${s.mode==='all'?' selected':''}>전체 (제한 없음)</option></select>
+<div id="ai-period-row"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">기간</label>
+<select id="ai-months" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:11px">${[1,3,6,12].map(m=>`<option value="${m}"${(s.months||3)===m?' selected':''}>최근 ${m}개월</option>`).join('')}</select></div>
+<div id="ai-count-row"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:3px">개수</label>
+<select id="ai-count" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:11px">${[20,50,100].map(n=>`<option value="${n}"${(s.count||50)===n?' selected':''}>최근 ${n}개</option>`).join('')}</select></div>
+<div class="chk-row" style="border-top:1px solid #f0f0f0;margin-top:6px;padding-top:10px"><input type="checkbox" id="ai-autocont"${s.autocont?' checked':''}><label for="ai-autocont" style="font-size:11px;line-height:1.4">답변 이어쓰기 — 답이 길어 잘리면 자동으로 이어서 완성 (Pro 사용량 소폭 증가)</label></div>
+<div style="font-size:10px;color:#f57c00;margin-top:8px">⚠️ '전체'는 데이터가 많을수록 응답이 느려지고 Pro 사용량이 늘 수 있습니다.</div>`,
+ `<button class="btn-c" onclick="closeModal()">취소</button><button class="btn-p" onclick="saveAISettings()">저장</button>`,400);
+ aiSettingsToggle();
+}
+function aiSettingsToggle(){const m=$('ai-mode')?.value;const p=$('ai-period-row'),c=$('ai-count-row');if(p)p.style.display=(m==='period')?'block':'none';if(c)c.style.display=(m==='count')?'block':'none';}
+function saveAISettings(){S.aiSettings={mode:$('ai-mode').value,months:parseInt($('ai-months').value)||3,count:parseInt($('ai-count').value)||50,autocont:$('ai-autocont').checked};saveS();closeModal();renderWS();showToast('⚙️ AI 설정이 저장됐습니다.');}
 function pJSON(t,f){try{return JSON.parse((t||'').replace(/```json|```/g,'').trim());}catch(e){return f;}}
 async function loadS(){
  try{
@@ -477,7 +519,7 @@ function wsContent(id){
 <div style="display:flex;justify-content:space-between;font-size:10px;color:#888;margin-bottom:3px"><span>완료율</span><span>${pct}%</span></div><div style="height:6px;background:#f0f0f0;border-radius:3px;overflow:hidden"><div style="height:100%;background:#1a73e8;width:${pct}%"></div></div>
 <div style="font-size:11px;margin-top:8px">${hasDr?'<span style="color:#188038">✅ 일일보고 작성완료</span>':'<span style="color:#e65100">⚠️ 일일보고 미작성</span>'}</div>`;}
  if(id==='ws-chat'){
-  const msgs=S.wsChatHistory.slice(-20).map(m=>`<div class="ws-chat-msg ${m.role==='user'?'user':'ai'}">${m.role==='user'?esc(m.content):md2html(m.content)}</div>`).join('');
+  const msgs=S.wsChatHistory.slice(-20).map(m=>`<div class="ws-chat-msg ${m.role==='user'?'user':'ai'}">${esc(m.content)}</div>`).join('');
   return`<div class="ws-chat-box"><div class="ws-chat-top"><button class="ws-chat-cfg" onclick="openAISettings()" title="AI 참조 설정">⚙️ ${aiScopeLabel()}</button><button class="ws-chat-clear" onclick="clearWsChat()" title="대화 초기화">🗑️ 대화 초기화</button></div><div class="ws-chat-msgs" id="ws-chat-msgs">${msgs||'<div style="color:#ccc;font-size:11px">캘린더 데이터 기반으로 질문하거나 업무 관련 내용을 물어보세요.</div>'}</div><div class="ws-chat-input-row"><input class="ws-chat-input" id="ws-chat-inp" placeholder="질문 입력..." onkeydown="if(event.key==='Enter')sendWsChat()"><button class="ws-chat-send" onclick="sendWsChat()">전송</button></div></div>`;}
  if(id==='ws-clients'){
   if(!S.clients.length)return`<div style="font-size:11px;color:#ccc">고객사 없음</div>`;
