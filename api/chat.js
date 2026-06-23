@@ -4,52 +4,36 @@ export default async function handler(req, res) {
   }
 
   const { system, messages, max_tokens = 1000 } = req.body;
-  const GEMINI_KEY = process.env.GEMINI_API_KEY;
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
-  if (!GEMINI_KEY) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
+  if (!ANTHROPIC_KEY) {
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
   }
 
   try {
-    // system + messages → Gemini contents 형식으로 변환
-    const contents = [];
-
-    // 대화 이력 변환 (user/assistant → user/model)
-    for (const m of messages) {
-      contents.push({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }]
-      });
-    }
-
-    const body = {
-      system_instruction: system ? { parts: [{ text: system }] } : undefined,
-      contents,
-      generationConfig: {
-        maxOutputTokens: max_tokens,
-        temperature: 0.7
-      }
-    };
-
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      }
-    );
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens,
+        system: system || '',
+        messages
+      })
+    });
 
     const data = await r.json();
 
     if (!r.ok) {
-      return res.status(r.status).json({ error: data.error?.message || 'Gemini error' });
+      return res.status(r.status).json({ error: data.error?.message || 'Anthropic error' });
     }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const finishReason = data.candidates?.[0]?.finishReason || '';
-    // MAX_TOKENS일 때 continued=true → callAI에서 이어쓰기 판단
-    const continued = finishReason === 'MAX_TOKENS';
+    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
+    const continued = data.stop_reason === 'max_tokens';
 
     res.status(200).json({ text, continued });
   } catch (e) {
