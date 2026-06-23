@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>깡비 캘린더</title>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>🤖 깡비서</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='85'>📅</text></svg>">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -209,7 +209,7 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#222;font-s
 <div id="toast-el"></div>
 <!-- ═══ 앱 탭 헤더 ═══ -->
 <div id="app-tab-bar" style="position:fixed;top:0;left:0;right:0;z-index:400;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;align-items:stretch;height:38px">
-  <div style="padding:0 14px;display:flex;align-items:center;font-size:13px;font-weight:700;color:#333;border-right:1px solid #f0f0f0;min-width:110px">깡비 캘린더</div>
+  <div style="padding:0 14px;display:flex;align-items:center;font-size:13px;font-weight:700;color:#333;border-right:1px solid #f0f0f0;min-width:110px">🤖 깡비서</div>
   <button id="apptab-cal" onclick="switchApp('cal')" style="padding:0 18px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:600;color:#1a73e8;border-bottom:2px solid #1a73e8">📅 캘린더</button>
   <button id="apptab-pl" onclick="switchApp('pl')" style="padding:0 18px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:500;color:#888;border-bottom:2px solid transparent">💰 손익 관리</button>
 </div>
@@ -279,6 +279,7 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#222;font-s
       <div style="padding:8px 8px 4px;border-top:1px solid #f5f5f5;margin-top:4px">
         <div style="font-size:9px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;padding:0 4px">센터 추가</div>
         <button class="sb-btn" style="color:#1a73e8;font-size:10px" onclick="openAddPLCenter()">+ 센터 추가</button>
+        <button class="sb-btn" style="color:#888;font-size:10px" onclick="openHiddenCentersManager()">👁 숨겨진 센터</button>
       </div>
     </div>
     <!-- 손익 메인 콘텐츠 -->
@@ -1308,8 +1309,16 @@ const RAW_CENTER_ALIAS={
 'ASP_LG전자성수기사업':'ASP_LG전자성수기',
 };
 // ASP 센터 포함 여부에 따라 센터 목록 반환
-function getActiveCenters(includeAsp){
-return(S.pl.centers||[]).filter(c=>includeAsp||!c.asp);
+function getActiveCenters(includeAsp,ym){
+// ym이 주어지면 해당 월에 숨겨진/미시작 센터 제외
+return(S.pl.centers||[]).filter(c=>{
+  if(!includeAsp&&c.asp)return false;
+  if(ym){
+    if(c.startYm&&ym<c.startYm)return false;// 시작 전
+    if(c.hideYm&&ym>=c.hideYm)return false;// 숨기기 시작 이후
+  }
+  return true;
+});
 }
 function resolveCenterAlias(rawName){
 const ua=(S.pl&&S.pl.centerAlias)||{};
@@ -1484,6 +1493,8 @@ else if(plTab==='issues')el.innerHTML=plIssuesHtml();
 else if(plTab==='aichat')el.innerHTML=plAiChatHtml();
 }
 function plDashboardHtml(){
+if(!S.pl.widgetSettings)S.pl.widgetSettings={trend:true,anomaly:true,target:true,aichat:true,trendMonths:1};
+const ws=S.pl.widgetSettings;
 const centers=getActiveCenters(true);// 대시보드: ASP 포함
 if(!centers.length)return`<div style="color:#ccc;font-size:12px;padding:30px;text-align:center">먼저 "+ 센터 추가"로 담당 센터를 등록해 주세요.</div>`;
 const now=new Date();
@@ -1609,7 +1620,95 @@ ${anals.length?`<div style="margin-top:4px;padding:5px 8px;background:#fff;borde
 }
 // ── 12개월 추이 + 지표 선택 ──
 html+=plTrendHtml(thisYM);
-return html;
+// ── 우측 위젯 패널 ──
+const rightPanel=buildPLWidgetPanel(ws,thisYM,mode,centers);
+const wrapped=`<div style="display:flex;gap:0;height:100%;min-height:0"><div style="flex:1;min-width:0;overflow-y:auto">${html}</div>${rightPanel}</div>`;
+return wrapped;
+}
+function buildPLWidgetPanel(ws,thisYM,mode,centers){
+if(!ws||(!ws.trend&&!ws.anomaly&&!ws.target&&!ws.aichat)){
+return`<div style="width:36px;flex-shrink:0;background:#fff;border-left:1px solid #eee;display:flex;flex-direction:column;align-items:center;padding-top:12px"><button title="위젯 설정" onclick="openWidgetSettings()" style="background:none;border:none;cursor:pointer;font-size:14px;color:#ccc">⚙️</button></div>`;
+}
+let p=`<div style="width:260px;min-width:260px;flex-shrink:0;background:#fff;border-left:1px solid #eee;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+<span style="font-size:10px;font-weight:700;color:#888">위젯 패널</span>
+<button onclick="openWidgetSettings()" style="background:none;border:none;cursor:pointer;font-size:11px;color:#aaa">⚙️</button>
+</div>`;
+if(ws.trend){
+const allYMs=getAllYMs();const ymIdx=allYMs.indexOf(thisYM);
+const tMonths=ws.trendMonths||1;
+p+=`<div style="background:#f8fbff;border:1px solid #c5d8fb;border-radius:8px;padding:8px">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+<span style="font-size:10px;font-weight:700;color:#1557b0">📈 이익률 트렌드</span>
+<select onchange="S.pl.widgetSettings.trendMonths=parseInt(this.value);savePL();renderPLTabContent()" style="font-size:9px;padding:2px 4px;border:1px solid #ddd;border-radius:4px">
+${[1,3,6,12].map(n=>`<option value="${n}"${tMonths===n?' selected':''}>${n===1?'전월 비교':n+'개월'}</option>`).join('')}
+</select></div>`;
+centers.filter(c=>!c.asp).forEach(c=>{
+const rec=getDashRecord(c.id,thisYM,mode)||{};
+const cur=rec.revenue?(((rec.centerProfit||0)/rec.revenue)*100):null;
+let chg=null;
+const prevYm=allYMs[ymIdx-1];
+if(tMonths===1&&prevYm){const pr=getDashRecord(c.id,prevYm,mode)||{};const pv=pr.revenue?((pr.centerProfit||0)/pr.revenue)*100:null;if(cur!=null&&pv!=null)chg=cur-pv;}
+else if(tMonths>1){const pvs=allYMs.slice(Math.max(0,ymIdx-tMonths),ymIdx).map(m=>{const r=getDashRecord(c.id,m,mode)||{};return r.revenue?((r.centerProfit||0)/r.revenue)*100:null;}).filter(v=>v!=null);if(pvs.length&&cur!=null)chg=cur-(pvs.reduce((a,b)=>a+b,0)/pvs.length);}
+const rc=cur==null?'#ccc':cur>=5?'#188038':cur>=0?'#f57c00':'#d32f2f';
+const cs=chg==null?'—':chg>0?`<span style="color:#188038">▲${Math.abs(chg).toFixed(1)}p</span>`:`<span style="color:#d32f2f">▼${Math.abs(chg).toFixed(1)}p</span>`;
+p+=`<div style="display:flex;align-items:center;gap:4px;padding:3px 0;border-bottom:1px solid #eef4ff"><div style="font-size:9px;color:#555;width:68px;flex-shrink:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escAttr(c.name)}</div><div style="font-size:10px;font-weight:600;color:${rc};flex:1">${cur==null?'—':cur.toFixed(1)+'%'}</div><div style="font-size:9px">${cs}</div></div>`;});
+p+=`</div>`;}
+if(ws.anomaly){
+const problems=getProblemCenters(thisYM,mode);
+p+=`<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:8px"><div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:6px">⚠️ 이상징후 (${problems.length}건)</div>`;
+if(!problems.length){p+=`<div style="font-size:9px;color:#aaa">감지된 이상징후 없음</div>`;}
+else problems.slice(0,4).forEach(prob=>{p+=`<div style="border-left:2px solid #f59e0b;padding:4px 6px;margin-bottom:4px;border-radius:0 4px 4px 0;background:#fffdf0"><div style="font-size:10px;font-weight:600;color:#92400e">${escAttr(prob.name)}</div><div style="font-size:9px;color:#b45309;line-height:1.4">${prob.reasons.map(r=>r.detail||r.type).slice(0,2).join(' · ')}</div></div>`;});
+if(problems.length>4)p+=`<div style="font-size:9px;color:#aaa">외 ${problems.length-4}건</div>`;
+p+=`</div>`;}
+if(ws.target){
+p+=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px"><div style="font-size:10px;font-weight:700;color:#14532d;margin-bottom:6px">🎯 목표 달성률</div><table style="width:100%;border-collapse:collapse;font-size:9px"><tr style="border-bottom:1px solid #d1fae5"><th style="text-align:left;padding:2px 3px;color:#555;font-weight:500">센터</th><th style="text-align:right;padding:2px 3px;color:#555;font-weight:500">매출</th><th style="text-align:right;padding:2px 3px;color:#555;font-weight:500">본부이익</th></tr>`;
+centers.filter(c=>!c.asp).forEach(c=>{
+const rec=getDashRecord(c.id,thisYM,mode)||{};
+const tgt=getTargetAgg(c.id,thisYM,mode);
+const rA=tgt.revenue?achieveRate(rec.revenue||0,tgt.revenue):null;
+const hA=tgt.hqProfit?achieveRate(rec.hqProfit||0,tgt.hqProfit):null;
+const rD=tgt.revenue?((rec.revenue||0)-tgt.revenue):null;
+const hD=tgt.hqProfit?((rec.hqProfit||0)-tgt.hqProfit):null;
+const ac=v=>v==null?'#ccc':v>=100?'#188038':v>=80?'#f57c00':'#d32f2f';
+const cell=(ach,diff,tv,av)=>ach==null?`<td style="text-align:right;padding:2px 3px;color:#ccc">—</td>`:`<td style="text-align:right;padding:2px 3px"><div style="font-size:9px;font-weight:700;color:${ac(ach)}">${ach.toFixed(0)}%</div><div style="font-size:8px;color:#888">${fmtMoney(av||0)}/${fmtMoney(tv||0)}</div><div style="font-size:8px;color:${diff>=0?'#188038':'#d32f2f'}">${diff>=0?'+':''}${fmtMoney(diff||0)}</div></td>`;
+p+=`<tr style="border-bottom:1px solid #f0fdf4"><td style="padding:3px;font-size:9px;color:#333;font-weight:500;max-width:60px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escAttr(c.name)}</td>${cell(rA,rD,tgt.revenue,rec.revenue)}${cell(hA,hD,tgt.hqProfit,rec.hqProfit)}</tr>`;});
+p+=`</table></div>`;}
+if(ws.aichat){
+if(!S.pl.widgetChat)S.pl.widgetChat=[];
+const msgs=S.pl.widgetChat.slice(-6);
+const mh=msgs.map(m=>`<div style="padding:4px 6px;border-radius:6px;margin-bottom:3px;font-size:10px;line-height:1.5;${m.role==='user'?'background:#e8f0fe;color:#1557b0;text-align:right':'background:#f8f9fa;color:#333'}">${escAttr(m.content)}</div>`).join('');
+p+=`<div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:8px;display:flex;flex-direction:column"><div style="font-size:10px;font-weight:700;color:#333;margin-bottom:6px">💬 AI 채팅</div><div id="pl-widget-chat-msgs" style="overflow-y:auto;max-height:160px;margin-bottom:6px">${mh||'<div style="font-size:9px;color:#ccc">손익 관련 질문을 입력하세요</div>'}</div><div style="display:flex;gap:4px"><input id="pl-widget-chat-inp" placeholder="질문..." style="flex:1;padding:4px 7px;border:1px solid #ddd;border-radius:12px;font-size:10px;font-family:inherit" onkeydown="if(event.key==='Enter')runWidgetChat()"><button onclick="runWidgetChat()" style="background:#1a73e8;color:#fff;border:none;border-radius:12px;padding:4px 9px;cursor:pointer;font-size:10px">전송</button></div></div>`;}
+p+=`</div>`;return p;}
+function openWidgetSettings(){
+const ws=S.pl.widgetSettings||{trend:true,anomaly:true,target:true,aichat:true,trendMonths:1};
+showModal(`<div class="modal" style="max-width:360px"><button class="xbtn" onclick="closeModal()">×</button><h3>⚙️ 위젯 패널 설정</h3><div style="font-size:10px;color:#888;margin-bottom:12px">표시할 위젯을 선택하세요.</div><div class="chk-row"><input type="checkbox" id="ws-trend" ${ws.trend?'checked':''}><label for="ws-trend">📈 이익률 트렌드</label></div><div class="chk-row"><input type="checkbox" id="ws-anomaly" ${ws.anomaly?'checked':''}><label for="ws-anomaly">⚠️ 이상징후 알림</label></div><div class="chk-row"><input type="checkbox" id="ws-target" ${ws.target?'checked':''}><label for="ws-target">🎯 목표 달성률</label></div><div class="chk-row"><input type="checkbox" id="ws-aichat" ${ws.aichat?'checked':''}><label for="ws-aichat">💬 AI 채팅</label></div><div class="mactions"><button class="btn-c" onclick="closeModal()">취소</button><button class="btn-p" onclick="saveWidgetSettings()">저장</button></div></div>`);
+}
+async function saveWidgetSettings(){
+const ws=S.pl.widgetSettings||{trendMonths:1};
+ws.trend=!!document.getElementById('ws-trend')?.checked;
+ws.anomaly=!!document.getElementById('ws-anomaly')?.checked;
+ws.target=!!document.getElementById('ws-target')?.checked;
+ws.aichat=!!document.getElementById('ws-aichat')?.checked;
+S.pl.widgetSettings=ws;await savePL();closeModal();renderPLTabContent();
+}
+async function runWidgetChat(){
+const inp=document.getElementById('pl-widget-chat-inp');
+if(!inp||!inp.value.trim()||aiChatBusy)return;
+const q=inp.value.trim();inp.value='';
+if(!S.pl.widgetChat)S.pl.widgetChat=[];
+S.pl.widgetChat.push({role:'user',content:q});
+renderPLTabContent();aiChatBusy=true;
+try{
+const ctrs=getActiveCenters(true);
+const allYMs=getAllYMs().slice(-3);
+let ctx='';ctrs.forEach(c=>{allYMs.forEach(ym=>{const r=(S.pl.records[c.id]||{})[ym];if(!r)return;ctx+=`[${c.name}][${ym}] 매출:${fmtMoney(r.revenue||0)} 센터이익:${fmtMoney(r.centerProfit||0)} 본부이익:${fmtMoney(r.hqProfit||0)}\n`;});});
+const ans=await callAI(`KTIS 콜센터 BPO PM 손익 분석 보조. ${AI_BREVITY}\n현재 손익:\n${ctx||'데이터 없음'}`,q,800,false);
+S.pl.widgetChat.push({role:'assistant',content:ans});
+if(S.pl.widgetChat.length>20)S.pl.widgetChat=S.pl.widgetChat.slice(-20);
+await savePL();
+}catch(e){S.pl.widgetChat.push({role:'assistant',content:'오류가 발생했습니다.'});}
+aiChatBusy=false;renderPLTabContent();
 }
 // 12개월 추이 (지표 선택: 매출/센터이익률/본부이익률/전사이익률)
 function plTrendHtml(thisYM){
@@ -2472,24 +2571,84 @@ await savePL();alert(`${ym.value} 데이터가 저장됐습니다. (입력한 �
 switchPLTab('dashboard');renderPL(document.getElementById('pl-body'));
 }
 function openAddPLCenter(){
-showModal(`<div class="modal"><button class="xbtn" onclick="closeModal()">×</button><h3>센터 추가</h3><label>센터명</label><input id="plc-name" type="text" placeholder="예) 케이뱅크 콜센터"><div class="mactions"><button class="btn-c" onclick="closeModal()">취소</button><button class="btn-p" onclick="saveAddPLCenter()">추가</button></div></div>`);
+const now=new Date();
+const curYm=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+showModal(`<div class="modal"><button class="xbtn" onclick="closeModal()">×</button>
+<h3>+ 센터 추가</h3>
+<label>센터명</label><input id="plc-name" placeholder="예: KB손보부천" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:8px">
+<label>데이터 시작 연월 <span style="font-size:9px;color:#aaa">(이 월부터 데이터 표시)</span></label>
+<input id="plc-start" type="month" value="${curYm}" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+<div class="mactions"><button class="btn-c" onclick="closeModal()">취소</button><button class="btn-p" onclick="saveAddPLCenter()">추가</button></div>
+</div>`);
 }
 async function saveAddPLCenter(){
-const name=document.getElementById('plc-name').value.trim();
+const name=document.getElementById('plc-name')?.value.trim();
+const start=document.getElementById('plc-start')?.value||'';
 if(!name){alert('센터명을 입력해주세요.');return;}
 const id='plc_'+Date.now();
-S.pl.centers.push({id,name});
+S.pl.centers.push({id,name,startYm:start||null});
 if(!S.pl.records[id])S.pl.records[id]={};
 await savePL();closeModal();renderPL(document.getElementById('pl-body'));
 }
 function delPLCenter(id){
 const ctr=S.pl.centers.find(c=>c.id===id);if(!ctr)return;
-showConfirmModal(`<p style="font-size:12px">"${escAttr(ctr.name)}" 센터와 해당 손익 데이터를 삭제할까요?</p>`,async()=>{
-S.pl.centers=S.pl.centers.filter(c=>c.id!==id);
-delete S.pl.records[id];
-await savePL();closeModal();renderPL(document.getElementById('pl-body'));
-},'삭제');
+const allYMs=getAllYMs();
+const now=new Date();
+const curYm=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+const defaultHide=allYMs.length?allYMs[allYMs.length-1]:curYm;
+showModal(`<div class="modal"><button class="xbtn" onclick="closeModal()">×</button>
+<h3>센터 숨기기 — ${escAttr(ctr.name)}</h3>
+<div style="font-size:11px;color:#555;margin-bottom:10px;line-height:1.6;background:#fff8e1;border-radius:6px;padding:8px">
+데이터는 삭제되지 않습니다.<br>선택한 월 <b>이후</b> 데이터만 숨겨지고, 이전 데이터는 그대로 유지됩니다.
+</div>
+<label>숨기기 시작 연월 <span style="font-size:9px;color:#aaa">(이 월부터 화면에서 숨김)</span></label>
+<input id="plc-hide-ym" type="month" value="${defaultHide}" style="width:100%;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px">
+<div class="mactions">
+<button class="btn-c" onclick="closeModal()">취소</button>
+<button class="btn-d" onclick="confirmHideCenter('${id}')">숨기기 적용</button>
+</div>
+</div>`);
 }
+async function confirmHideCenter(id){
+const hideYm=document.getElementById('plc-hide-ym')?.value;
+if(!hideYm){alert('숨기기 시작 연월을 선택해주세요.');return;}
+const ctr=S.pl.centers.find(c=>c.id===id);if(!ctr)return;
+ctr.hideYm=hideYm;
+await savePL();closeModal();renderPL(document.getElementById('pl-body'));
+}
+function openHiddenCentersManager(){
+const hidden=(S.pl.centers||[]).filter(c=>c.hideYm);
+if(!hidden.length){alert('숨겨진 센터가 없습니다.');return;}
+const rows=hidden.map(c=>`
+<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0">
+<div style="flex:1">
+<div style="font-size:12px;font-weight:600;color:#333">${escAttr(c.name)}</div>
+<div style="font-size:10px;color:#aaa">숨기기 시작: ${c.hideYm} / 추가시작: ${c.startYm||'전체'}</div>
+</div>
+<input type="month" id="hide-ym-${c.id}" value="${c.hideYm}" style="padding:4px 6px;border:1px solid #ddd;border-radius:5px;font-size:11px">
+<button class="btn-o" style="font-size:10px;padding:4px 8px;white-space:nowrap" onclick="updateHideYm('${c.id}')">수정</button>
+<button class="btn-g" style="font-size:10px;padding:4px 8px;white-space:nowrap" onclick="unhideCenter('${c.id}')">숨기기 취소</button>
+</div>`).join('');
+showModal(`<div class="modal" style="max-width:520px"><button class="xbtn" onclick="closeModal()">×</button>
+<h3>👁 숨겨진 센터 관리</h3>
+<div style="font-size:10px;color:#888;margin-bottom:10px">숨기기 취소 시 해당 센터와 모든 데이터가 다시 표시됩니다.</div>
+${rows}
+<div class="mactions"><button class="btn-c" onclick="closeModal()">닫기</button></div>
+</div>`);
+}
+async function updateHideYm(id){
+const ctr=S.pl.centers.find(c=>c.id===id);if(!ctr)return;
+const val=document.getElementById('hide-ym-'+id)?.value;
+if(!val){alert('연월을 선택해주세요.');return;}
+ctr.hideYm=val;
+await savePL();closeModal();openHiddenCentersManager();renderPL(document.getElementById('pl-body'));
+}
+async function unhideCenter(id){
+const ctr=S.pl.centers.find(c=>c.id===id);if(!ctr)return;
+delete ctr.hideYm;
+await savePL();closeModal();renderPL(document.getElementById('pl-body'));
+}
+
 function exportPLCSV(){
 const centers=S.pl.centers||[];
 if(!centers.length){alert('데이터가 없습니다.');return;}
@@ -2640,7 +2799,8 @@ const aiHistList=[...aiReports].reverse().slice(1);// 최신 제외 히스토리
 const aiHTotal=Math.ceil(aiHistList.length/PER_PAGE);
 const aiHPage=Math.min(aiReportPage,Math.max(0,aiHTotal-1));
 const aiHSlice=aiHistList.slice(aiHPage*PER_PAGE,(aiHPage+1)*PER_PAGE);
-let html=`<div class="scard" style="border:1px solid #c3d9ff;background:#f5f9ff;margin-bottom:12px">
+let html=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+<div class="scard" style="border:1px solid #c3d9ff;background:#f5f9ff;margin-bottom:0">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
 <h4 style="margin:0;flex:1">🤖 AI 분석 결과</h4>
 <div style="display:flex;align-items:center;gap:6px">
@@ -2703,6 +2863,7 @@ html+=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;fle
 </div>
 <div style="font-size:10px;color:#888;margin-bottom:8px">직접 작성한 내용이 AI 분석의 기초 자료가 됩니다.</div>`;
 const orderCenters=[...centers].sort((a,b)=>(probIds.has(b.id)?1:0)-(probIds.has(a.id)?1:0));
+html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">`;
 orderCenters.forEach(c=>{
 const rec=getDashRecord(c.id,ym,'single');
 const isProb=probIds.has(c.id);
@@ -2736,6 +2897,7 @@ ${histYms.map(hy=>{const h=S.pl.issues[c.id][hy];return`<div style="padding:4px 
 </details>`:''}
 </div>`;
 });
+html+=`</div>`;
 return html;
 }
 async function saveMemo(){
