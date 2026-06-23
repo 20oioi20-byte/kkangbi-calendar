@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>🤖 깡비서</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='85'>📅</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='85'>🤖</text></svg>">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#222;font-size:14px}
@@ -1495,7 +1495,7 @@ else if(plTab==='aichat')el.innerHTML=plAiChatHtml();
 function plDashboardHtml(){
 if(!S.pl.widgetSettings)S.pl.widgetSettings={trend:true,anomaly:true,target:true,aichat:true,trendMonths:1};
 const ws=S.pl.widgetSettings;
-const centers=getActiveCenters(true);// 대시보드: ASP 포함
+const centers=getActiveCenters(true,thisYM);// 대시보드: ASP 포함, hideYm 필터 적용
 if(!centers.length)return`<div style="color:#ccc;font-size:12px;padding:30px;text-align:center">먼저 "+ 센터 추가"로 담당 센터를 등록해 주세요.</div>`;
 const now=new Date();
 const curYM=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -1684,32 +1684,29 @@ p+=`</div>`;}
 // ── 🎯 목표 달성률 ──
 if(ws.target){
 p+=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px">
-<div style="font-size:10px;font-weight:700;color:#14532d;margin-bottom:8px">🎯 목표 달성률</div>
-<table style="width:100%;border-collapse:collapse">
-<tr style="border-bottom:1px solid #d1fae5">
-<th style="text-align:left;padding:3px 2px;font-size:9px;font-weight:500;color:#555">센터</th>
-<th style="text-align:right;padding:3px 2px;font-size:9px;font-weight:500;color:#555">매출</th>
-<th style="text-align:right;padding:3px 2px;font-size:9px;font-weight:500;color:#555">본부이익</th>
-</tr>`;
+<div style="font-size:10px;font-weight:700;color:#14532d;margin-bottom:8px">🎯 목표 달성률</div>`;
+const barSection=(label,field,tgtField,color)=>{
+let s=`<div style="font-size:9px;font-weight:600;color:#555;margin-bottom:4px;margin-top:6px">${label}</div>`;
 centers.filter(c=>!c.asp).forEach(c=>{
 const rec=getDashRecord(c.id,thisYM,mode)||{};
 const tgt=getTargetAgg(c.id,thisYM,mode);
-const rA=tgt.revenue?achieveRate(rec.revenue||0,tgt.revenue):null;
-const hA=tgt.hqProfit?achieveRate(rec.hqProfit||0,tgt.hqProfit):null;
-const rD=tgt.revenue?((rec.revenue||0)-tgt.revenue):null;
-const hD=tgt.hqProfit?((rec.hqProfit||0)-tgt.hqProfit):null;
-const aC=v=>v==null?'#aaa':v>=100?'#188038':v>=80?'#f57c00':'#d32f2f';
-const cell=(ach,diff,tv,av)=>{
-if(ach==null)return`<td style="text-align:right;padding:3px 2px;color:#aaa;font-size:9px">—</td>`;
-return`<td style="text-align:right;padding:3px 2px;vertical-align:top">
-<div style="font-size:10px;font-weight:700;color:${aC(ach)}">${ach.toFixed(0)}%</div>
-<div style="font-size:8px;color:#888;white-space:nowrap">${fmtMoney(av||0)} / ${fmtMoney(tv||0)}</div>
-<div style="font-size:8px;color:${(diff||0)>=0?'#188038':'#d32f2f'};white-space:nowrap">${(diff||0)>=0?'+':''}${fmtMoney(diff||0)}</div>
-</td>`;};
-p+=`<tr style="border-bottom:1px solid #ecfdf5">
-<td style="padding:4px 2px;font-size:9px;color:#333;font-weight:500;max-width:56px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;vertical-align:top;padding-top:6px">${escAttr(c.name)}</td>
-${cell(rA,rD,tgt.revenue,rec.revenue)}${cell(hA,hD,tgt.hqProfit,rec.hqProfit)}</tr>`;});
-p+=`</table></div>`;}
+const tv=tgt[tgtField],av=rec[field]||0;
+const ach=tv?Math.min(achieveRate(av,tv),150):null;
+const pctLabel=ach==null?'목표없음':ach.toFixed(0)+'%';
+const barColor=ach==null?'#ddd':ach>=100?'#188038':ach>=80?'#f57c00':'#d32f2f';
+const barW=ach==null?0:Math.min(ach,100);
+s+=`<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+<div style="font-size:9px;color:#333;width:60px;flex-shrink:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escAttr(c.name)}</div>
+<div style="flex:1;height:7px;background:#e8f5e9;border-radius:4px;overflow:hidden;position:relative">
+<div style="height:100%;width:${barW}%;background:${barColor};border-radius:4px;transition:width .3s"></div>
+${ach!=null&&ach>100?`<div style="position:absolute;right:0;top:0;height:100%;width:2px;background:#1a73e8"></div>`:''}
+</div>
+<div style="font-size:9px;font-weight:700;color:${barColor};width:30px;text-align:right;flex-shrink:0">${pctLabel}</div>
+</div>`;});
+return s;};
+p+=barSection('📦 매출','revenue','revenue','#1a73e8');
+p+=barSection('💹 본부이익','hqProfit','hqProfit','#188038');
+p+=`</div>`;}
 
 // ── 💬 AI 채팅 ──
 if(ws.aichat){
@@ -1764,7 +1761,7 @@ aiChatBusy=false;renderPLTabContent();
 }
 // 12개월 추이 (지표 선택: 매출/센터이익률/본부이익률/전사이익률)
 function plTrendHtml(thisYM){
-const centers=getActiveCenters(false);// 추이: ASP 제외
+const centers=getActiveCenters(false,thisYM);// 추이: ASP 제외, hideYm 필터
 const year=thisYM.slice(0,4);
 const allYMs=getAllYMs();
 let yMonths=[];for(let m=1;m<=12;m++){const k=`${year}-${String(m).padStart(2,'0')}`;if(allYMs.includes(k))yMonths.push(k);}
@@ -1848,7 +1845,7 @@ const c=cur[f.key]||0,p=prev[f.key]||0;
 if(!p)return;
 const pct=(c-p)/Math.abs(p)*100;
 const absDiff=Math.abs(c-p);
-if(Math.abs(pct)>=30&&absDiff>=5000){
+if(Math.abs(pct)>=10&&absDiff>=1000){
 msgs.push(pct>0?`${f.label} 전월 대비 +${pct.toFixed(0)}% (${fmtMoney(c-p)}) 급증`:`${f.label} 전월 대비 ${pct.toFixed(0)}% (${fmtMoney(c-p)}) 급락`);
 }
 });
@@ -2839,8 +2836,10 @@ await savePL();renderPLTabContent();
 // ── 목표 설정 관리 ──
 // ── 부진센터 사유 (월별 히스토리 + AI 분석) ──
 function plIssuesHtml(){
-const centers=getActiveCenters(true);
-const allYMs=getAllYMs();
+const allYMsTemp=getAllYMs();
+const ymTemp=(issueYm&&allYMsTemp.includes(issueYm))?issueYm:allYMsTemp[allYMsTemp.length-1];
+const centers=getActiveCenters(true,ymTemp);
+const allYMs=allYMsTemp;
 if(!allYMs.length)return`<div style="color:#ccc;font-size:12px;padding:30px;text-align:center">먼저 손익 데이터를 업로드해 주세요.</div>`;
 const ym=(issueYm&&allYMs.includes(issueYm))?issueYm:allYMs[allYMs.length-1];
 const ymIdx=allYMs.indexOf(ym);
@@ -2850,94 +2849,67 @@ if(!S.pl.issues)S.pl.issues={};
 if(!S.pl.memos)S.pl.memos=[];
 if(!S.pl.aiReports)S.pl.aiReports=[];
 const PER_PAGE=5;
-// ── 헬퍼: 페이징 렌더 ──
-const paginate=(arr,page,totalPages)=>{
-if(totalPages<=1)return'';
-return`<div style="display:flex;gap:4px;align-items:center;margin-top:6px">
-<button class="btn-o" style="font-size:10px;padding:3px 8px" ${page<=0?'disabled':''} onclick="return false">◀</button>
-${Array.from({length:totalPages},(_, i)=>`<button onclick="${arr==='memo'?`memoPage=${i}`:`aiReportPage=${i}`};renderPLTabContent()" style="padding:3px 8px;border:none;border-radius:4px;cursor:pointer;font-size:10px;background:${i===page?'#1a73e8':'#f0f0f0'};color:${i===page?'#fff':'#555'}">${i+1}</button>`).join('')}
-<button class="btn-o" style="font-size:10px;padding:3px 8px" ${page>=totalPages-1?'disabled':''} onclick="return false">▶</button>
-</div>`;
-};
 const pageBtn=(type,page,total)=>{
 if(total<=1)return'';
 return`<div style="display:flex;gap:4px;align-items:center;margin-top:6px">
-${Array.from({length:total},(_, i)=>`<button onclick="${type==='memo'?`memoPage=${i}`:`aiReportPage=${i}`};renderPLTabContent()" style="padding:3px 9px;border:none;border-radius:4px;cursor:pointer;font-size:10px;background:${i===page?'#1a73e8':'#f0f0f0'};color:${i===page?'#fff':'#555'};margin-right:2px">${i+1}</button>`).join('')}
-</div>`;
-};
-// ── 1. AI 분석 결과 (항상 최신 결과 보임 + 히스토리) ──
+${Array.from({length:total},(_,i)=>`<button onclick="${type==='memo'?`memoPage=${i}`:`aiReportPage=${i}`};renderPLTabContent()" style="padding:2px 7px;border-radius:4px;border:1px solid #ddd;background:${page===i?'#1a73e8':'#fff'};color:${page===i?'#fff':'#555'};cursor:pointer;font-size:10px">${i+1}</button>`).join('')}
+</div>`;};
+// ── 1. AI 분석 결과 ──
 const aiReports=S.pl.aiReports||[];
 const latestAI=aiReports.length?aiReports[aiReports.length-1]:null;
-const aiHistList=[...aiReports].reverse().slice(1);// 최신 제외 히스토리
+const aiHistList=[...aiReports].reverse().slice(1);
 const aiHTotal=Math.ceil(aiHistList.length/PER_PAGE);
 const aiHPage=Math.min(aiReportPage,Math.max(0,aiHTotal-1));
 const aiHSlice=aiHistList.slice(aiHPage*PER_PAGE,(aiHPage+1)*PER_PAGE);
-let html=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-<div class="scard" style="border:1px solid #c3d9ff;background:#f5f9ff;margin-bottom:0">
+const aiCardHtml=`<div class="scard" style="border:1px solid #c3d9ff;background:#f5f9ff;margin-bottom:0">
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
 <h4 style="margin:0;flex:1">🤖 AI 분석 결과</h4>
 <div style="display:flex;align-items:center;gap:6px">
 <span style="font-size:9px;color:#aaa">월 분석 → 별도 저장됨</span>
-<button class="btn-p" style="font-size:10px;padding:5px 12px" onclick="runIssueAI('${ym}')" ${aiBusy?'disabled':''}>${aiBusy?'⏳ 분석 중...':'🤖 '+ym+' 전체 분석'}</button>
-</div>
-</div>
-${latestAI?`<div style="background:#fff;border-radius:7px;padding:10px;border:1px solid #e0eaff;font-size:11px;line-height:1.7;white-space:pre-wrap;margin-bottom:8px">${latestAI.text}</div>
-<div style="font-size:9px;color:#aaa">📅 ${new Date(latestAI.ts).toLocaleString('ko-KR')} · ${latestAI.ym||''} 분석</div>`:'<div style="color:#ccc;font-size:11px;padding:8px">"AI 분석" 버튼으로 선택 월 전체 현황을 분석합니다.</div>'}
+<button class="btn-p" style="font-size:10px;padding:5px 12px" onclick="runIssueAI('${ym}')" ${aiBusy?'disabled':''}>${aiBusy?'분석 중...':'🔍 '+ym+' 전체 분석'}</button>
+</div></div>
+${latestAI?`<div style="background:#fff;border-radius:7px;padding:10px;border:1px solid #e0eaff;font-size:11px;line-height:1.7;white-space:pre-wrap;max-height:200px;overflow-y:auto">${escAttr(latestAI.content||latestAI.text||'')}</div>
+<div style="font-size:9px;color:#aaa;margin-top:4px">📅 ${new Date(latestAI.ts).toLocaleString('ko-KR')} · ${latestAI.ym||''} 분석</div>`:`<div style="font-size:11px;color:#aaa;padding:12px 0">\"AI 분석\" 버튼으로 선택 월 전체 현황을 분석합니다.</div>`}
 ${aiHistList.length?`<div style="margin-top:10px;border-top:1px solid #ddeaff;padding-top:8px">
 <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="aiReportExpanded=!aiReportExpanded;renderPLTabContent()">
 <span style="font-size:9px;color:#888;font-weight:600">📚 AI분석 히스토리 (${aiHistList.length}건)</span>
 <span style="font-size:10px;color:#aaa">${aiReportExpanded?'▲ 접기':'▼ 펼치기'}</span>
 </div>
-${aiReportExpanded?`<div style="margin-top:8px">
-${aiHSlice.map((r,ri)=>`<div style="padding:8px 0;border-bottom:1px solid #eef4ff">
+${aiReportExpanded?`<div style="margin-top:8px">${aiHSlice.map((r,ri)=>`<div style="padding:8px 0;border-bottom:1px solid #eef4ff">
 <div style="font-size:9px;color:#aaa;margin-bottom:3px">📅 ${new Date(r.ts).toLocaleString('ko-KR')} · ${r.ym||''}</div>
-<div style="font-size:10px;color:#666;line-height:1.6;white-space:pre-wrap;max-height:120px;overflow-y:auto">${escAttr(r.text)}</div>
+<div style="font-size:10px;color:#666;line-height:1.6;white-space:pre-wrap;max-height:120px;overflow-y:auto">${escAttr(r.content||r.text||'')}</div>
 <button class="iBtn" title="삭제" onclick="deleteAiReport(${aiReports.indexOf(r)})">🗑️</button>
-</div>`).join('')}
-${aiHTotal>1?pageBtn('aiReport',aiHPage,aiHTotal):''}
-</div>`:''}
-</div>`:''}
+</div>`).join('')}${aiHTotal>1?pageBtn('aiReport',aiHPage,aiHTotal):''}</div>`:''}</div>`:''}
 </div>`;
 // ── 2. 전체 메모 ──
 const memos=S.pl.memos||[];
 const memoTotal=Math.ceil(memos.length/PER_PAGE);
 const memoP=Math.min(memoPage,Math.max(0,memoTotal-1));
 const memoSlice=[...memos].reverse().slice(memoP*PER_PAGE,(memoP+1)*PER_PAGE);
-html+=`<div class="scard" style="background:#f8fbff;border:1px solid #c5d8fb;margin-bottom:12px">
+const memoCardHtml=`<div class="scard" style="background:#f8fbff;border:1px solid #c5d8fb;margin-bottom:0">
 <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
 <h4 style="margin:0;flex:1">📝 전체 메모</h4>
 <span style="font-size:9px;color:#aaa">AI 채팅에도 반영</span>
 </div>
-<textarea id="issue-memo-input" placeholder="전체 공유 사항, 이슈, 인사이트 등 자유롭게 메모..." style="width:100%;min-height:60px;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:11px;font-family:inherit;resize:vertical"></textarea>
+<textarea id="issue-memo-input" placeholder="전체 공유 사항, 이슈, 인사이트 등 자유롭게 메모..." style="width:100%;min-height:60px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:11px;font-family:inherit;resize:vertical"></textarea>
 <div style="margin-top:5px"><button class="btn-p" style="font-size:10px;padding:5px 14px" onclick="saveMemo()">메모 저장</button></div>
 ${memos.length?`<div style="margin-top:10px;border-top:1px solid #ddeaff;padding-top:8px">
 <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="memoExpanded=!memoExpanded;renderPLTabContent()">
 <span style="font-size:9px;color:#888;font-weight:600">📚 메모 히스토리 (${memos.length}건)</span>
 <span style="font-size:10px;color:#aaa">${memoExpanded?'▲ 접기':'▼ 펼치기'}</span>
 </div>
-${memoExpanded?`<div style="margin-top:8px">
-${memoSlice.map((m,ri)=>{const realIdx=memos.length-1-(memoP*PER_PAGE+ri);return`<div style="padding:7px 0;border-bottom:1px solid #f0f4ff">
+${memoExpanded?`<div style="margin-top:8px">${memoSlice.map((m,ri)=>{const realIdx=memos.length-1-(memoP*PER_PAGE+ri);return`<div style="padding:7px 0;border-bottom:1px solid #f5f5f5">
 <div style="font-size:9px;color:#aaa;margin-bottom:2px">${new Date(m.ts).toLocaleString('ko-KR')}</div>
 <div style="font-size:11px;line-height:1.6;white-space:pre-wrap">${escAttr(m.text)}</div>
 <button class="iBtn" title="삭제" onclick="deleteMemo(${realIdx})">🗑️</button>
-</div>`;}).join('')}
-${memoTotal>1?pageBtn('memo',memoP,memoTotal):''}
-</div>`:''}
-</div>`:''}
+</div>`;}).join('')}${memoTotal>1?pageBtn('memo',memoP,memoTotal):''}</div>`:''}</div>`:''}
 </div>`;
-// ── 3. 월별 센터 사유 (직접 작성) ──
+// ── 3. 센터별 부진사유 ──
 const problems=getProblemCenters(ym,'single');
 const probIds=new Set(problems.map(p=>p.id));
-html+=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-<b style="font-size:12px">✍️ 센터별 부진사유 직접 작성</b>
-<button class="btn-o" style="font-size:13px;padding:5px 9px;line-height:1" onclick="issueYm='${prevYm}';renderPLTabContent()">‹</button>
-<select onchange="issueYm=this.value;renderPLTabContent()" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit">${allYMs.map(m=>`<option value="${m}" ${m===ym?'selected':''}>${m}</option>`).join('')}</select>
-<button class="btn-o" style="font-size:13px;padding:5px 9px;line-height:1" onclick="issueYm='${nextYm}';renderPLTabContent()">›</button>
-</div>
-<div style="font-size:10px;color:#888;margin-bottom:8px">직접 작성한 내용이 AI 분석의 기초 자료가 됩니다.</div>`;
 const orderCenters=[...centers].sort((a,b)=>(probIds.has(b.id)?1:0)-(probIds.has(a.id)?1:0));
-html+=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">`;
-orderCenters.forEach(c=>{
+// 센터카드 HTML 생성 헬퍼
+const makeCenterCard=c=>{
 const rec=getDashRecord(c.id,ym,'single');
 const isProb=probIds.has(c.id);
 const cur=((S.pl.issues[c.id]||{})[ym])||null;
@@ -2947,31 +2919,52 @@ const prob=problems.find(p=>p.id===c.id);
 const tags=prob?prob.reasons.map(r=>r.type):[];
 let metricLines='';
 if(rec){
-const revLine=tgt.revenue!=null?(()=>{const ar=achieveRate(rec.revenue,tgt.revenue);const diff=(rec.revenue||0)-tgt.revenue;return`매출목표 ${fmtMoney(tgt.revenue)} / 매출 ${fmtMoney(rec.revenue)} / 차액 ${fmtMoney(diff)} / 달성률 ${achieveLabel(ar,tgt.revenue)}`;})():`매출 ${fmtMoney(rec.revenue)}`;
-const hqLine=tgt.hqProfit!=null?(()=>{const ah=achieveRate(rec.hqProfit,tgt.hqProfit);const diff=(rec.hqProfit||0)-tgt.hqProfit;return`본부이익목표 ${fmtMoney(tgt.hqProfit)} / 본부이익 ${fmtMoney(rec.hqProfit)} / 차액 ${fmtMoney(diff)} / 달성률 ${achieveLabel(ah,tgt.hqProfit)}`;})():`본부이익 ${fmtMoney(rec.hqProfit)}`;
+const revLine=tgt.revenue!=null?(()=>{const ar=achieveRate(rec.revenue,tgt.revenue);const diff=(rec.revenue||0)-tgt.revenue;return`매출목표 ${fmtMoney(tgt.revenue)} / 매출 ${fmtMoney(rec.revenue||0)} / 차액 ${fmtMoney(diff)} / 달성률 ${achieveLabel(ar,tgt.revenue)}`;})():'';
+const hqLine=tgt.hqProfit!=null?(()=>{const ah=achieveRate(rec.hqProfit,tgt.hqProfit);const diff=(rec.hqProfit||0)-tgt.hqProfit;return`본부이익목표 ${fmtMoney(tgt.hqProfit)} / 본부이익 ${fmtMoney(rec.hqProfit||0)} / 차액 ${fmtMoney(diff)} / 달성률 ${achieveLabel(ah,tgt.hqProfit)}`;})():'';
 const flags=[(rec.hqProfit||0)<0?'적자':'',tags.includes('이상징후')?'이상징후':''].filter(Boolean).join(' · ');
 const anomReason=(prob&&(prob.reasons.find(r=>r.type==='이상징후')||{}).detail)||'';
-metricLines=`<div style="font-size:9px;color:#555;margin-top:3px;line-height:1.7;background:#f7f8fa;border-radius:5px;padding:5px 8px">${revLine}<br>${hqLine}${flags?` · <span style="color:#d32f2f;font-weight:600">${flags}</span>`:''}${anomReason?`<br><span style="color:#e8710a">⚡ ${anomReason}</span>`:''}</div>`;
+metricLines=`<div style="font-size:9px;color:#555;margin-top:3px;line-height:1.7;background:#f7f8fa;border-radius:5px;padding:5px 7px">${revLine?`<div>${revLine}</div>`:''}${hqLine?`<div>${hqLine}</div>`:''}${flags?`<div style="color:#d32f2f;font-weight:600">${flags}</div>`:''}${anomReason?`<div style="color:#f57c00">⚡ ${anomReason}</div>`:''}</div>`;
 }else{metricLines=`<div style="font-size:9px;color:#ccc;margin-top:3px">데이터 없음</div>`;}
-html+=`<div class="scard" style="${isProb?'border:1px solid #f5c6c0;background:#fffafa':'border:1px solid #eee'}">
+const savedText=cur?cur.text:'';
+return`<div class="scard" style="${isProb?'border:1px solid #f5c6c0;background:#fffafa':'border:1px solid #eee'}">
 <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
 <b style="font-size:12px">${escAttr(c.name)}</b>
 ${isProb?'<span style="font-size:9px;background:#fce8e6;color:#d32f2f;border-radius:8px;padding:1px 7px">부진</span>':''}
-<button onclick="delPLCenter('${c.id}')" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:9px;color:#ccc;padding:1px 4px;border-radius:4px;border:1px solid #eee" title="숨기기/삭제">숨기기</button>
+<button onclick="delPLCenter('${c.id}')" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:9px;color:#ccc;padding:1px 4px;border-radius:4px;border:1px solid #eee">숨기기</button>
 </div>
 ${metricLines}
-<textarea id="iss-${c.id}" placeholder="${ym} 부진 사유 및 대응 내용을 직접 입력하세요" style="width:100%;min-height:60px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:11px;font-family:inherit;resize:vertical;margin-top:6px">${cur&&!cur.ai?escAttr(cur.text):''}</textarea>
+<textarea id="iss-${c.id}" placeholder="${ym} 부진 사유 및 대응 내용을 직접 입력하세요" style="width:100%;min-height:60px;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:11px;font-family:inherit;margin-top:6px;resize:vertical">${escAttr(savedText)}</textarea>
 <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
 <button class="btn-g" style="font-size:10px;padding:5px 12px" onclick="saveIssue('${c.id}','${ym}')">저장</button>
 ${cur?`<span style="font-size:9px;color:#aaa">${cur.ai?'🤖 AI 작성':'✍️ 직접 작성'} · ${cur.ts?new Date(cur.ts).toLocaleDateString('ko-KR'):''}</span>`:''}
 ${cur?`<button class="iBtn" style="margin-left:auto" title="삭제" onclick="deleteIssue('${c.id}','${ym}')">🗑️</button>`:''}
 </div>
-${histYms.length?`<details style="margin-top:6px;font-size:10px"><summary style="cursor:pointer;color:#aaa;font-size:9px">📚 이전 히스토리 ${histYms.length}건</summary>
-${histYms.map(hy=>{const h=S.pl.issues[c.id][hy];return`<div style="padding:4px 0;border-bottom:1px solid #f5f5f5;line-height:1.5"><b style="color:#999">${hy}</b> ${h.ai?'🤖':''} <span style="color:#777">${escAttr(h.text).slice(0,120)}${h.text.length>120?'…':''}</span></div>`;}).join('')}
+${histYms.length?`<details style="margin-top:6px;font-size:10px"><summary style="cursor:pointer;color:#aaa;font-size:9px">▶ 이전 히스토리 ${histYms.length}건</summary>
+${histYms.map(hy=>{const h=S.pl.issues[c.id][hy];return`<div style="padding:4px 0;border-bottom:1px solid #f5f5f5;line-height:1.5"><span style="font-size:9px;color:#aaa">${hy}</span> ${escAttr((h.text||'').slice(0,120))}${h.text&&h.text.length>120?'…':''}</div>`;}).join('')}
 </details>`:''}
+</div>`;};
+// 센터 홀수/짝수 분리 → 좌(AI 아래) / 우(메모 아래)
+const leftCenters=orderCenters.filter((_,i)=>i%2===0);
+const rightCenters=orderCenters.filter((_,i)=>i%2===1);
+// 월 선택 헤더
+let html=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+<b style="font-size:12px">✍️ 센터별 부진사유 직접 작성</b>
+<button class="btn-o" style="font-size:13px;padding:5px 9px;line-height:1" onclick="issueYm='${prevYm}';renderPLTabContent()">◀</button>
+<select onchange="issueYm=this.value;renderPLTabContent()" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;font-family:inherit">${allYMs.map(m=>`<option value="${m}"${m===ym?' selected':''}>${m}</option>`).join('')}</select>
+<button class="btn-o" style="font-size:13px;padding:5px 9px;line-height:1" onclick="issueYm='${nextYm}';renderPLTabContent()">▶</button>
+</div>
+<div style="font-size:10px;color:#888;margin-bottom:8px">직접 작성한 내용이 AI 분석의 기초 자료가 됩니다.</div>`;
+// 전체 화면 2열 레이아웃: 좌(AI+센터홀수) / 우(메모+센터짝수)
+html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:10px">
+${aiCardHtml}
+${leftCenters.map(c=>makeCenterCard(c)).join('')}
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+${memoCardHtml}
+${rightCenters.map(c=>makeCenterCard(c)).join('')}
+</div>
 </div>`;
-});
-html+=`</div>`;
 return html;
 }
 async function saveMemo(){
@@ -3004,7 +2997,7 @@ if(aiBusy)return;
 if(!S.pl.aiReports)S.pl.aiReports=[];
 aiBusy=true;renderPLTabContent();
 try{
-const centers=getActiveCenters(true);
+const centers=getActiveCenters(true,ym);
 if(!S.pl.issues)S.pl.issues={};
 // 센터별 실적 데이터 구성
 const accIdx=buildAccMapIndexFull();
@@ -3919,7 +3912,9 @@ return`<div style="display:flex;gap:4px;flex-shrink:0">
 }
 function plDetailHtmlInner(){
 ensureUiState();
-const centers=getActiveCenters(false);// ASP 제외
+const _detailAllYMs=getAllYMs();
+const _detailBaseYm=_detailAllYMs.length?_detailAllYMs[_detailAllYMs.length-1]:null;
+const centers=getActiveCenters(false,_detailBaseYm);// ASP 제외, hideYm 필터
 if(!centers.length)return`<div style="color:#ccc;font-size:12px;padding:30px;text-align:center">먼저 "+ 센터 추가"로 담당 센터를 등록해 주세요.</div>`;
 const allYMs=getAllYMs();
 if(!allYMs.length)return`<div style="color:#ccc;font-size:12px;padding:30px;text-align:center">아직 저장된 손익 데이터가 없습니다.</div>`;
@@ -4130,6 +4125,8 @@ try{return plCompareModeHtmlInner();}
 catch(e){return`<div class="scard"><div style="color:#d32f2f;font-size:11px;padding:14px"><b>센터 비교 렌더링 오류</b><br>${escAttr(e.message)}<br><pre style="white-space:pre-wrap;font-size:9px;color:#888;margin-top:8px">${escAttr(String(e.stack||'').slice(0,500))}</pre></div></div>`;}
 }
 function plCompareModeHtmlInner(){
+const _allYMsC=getAllYMs();
+const _compareBaseYm=_allYMsC.length?_allYMsC[_allYMsC.length-1]:null;
 ensureUiState();
 const centers=getActiveCenters(false);// ASP 제외
 if(!centers.length)return`<div style="color:#ccc;font-size:12px;padding:30px;text-align:center">먼저 "+ 센터 추가"로 담당 센터를 등록해 주세요.</div>`;
