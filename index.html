@@ -275,7 +275,7 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#222;font-s
 <script>
 // ═══ 환경 설정 (Supabase) ═══
 const SB_URL='https://zbiwyqwjehnogxkzlhxx.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiaXd5cXdqZWhub2d4a3psaHh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwOTQ1MzYsImV4cCI6MjA5NjY3MDUzNn0.SQJjHnDcMTRyElxtY9E-04yIkzPVF35L8hcx0lSyG48';
+const SB_KEY='SUPABASE_ANON_KEY_HERE';
 
 // ═══ 상수 ═══
 const MO=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
@@ -322,7 +322,7 @@ const $=id=>document.getElementById(id);
 const V=id=>($(id)?.value||'').trim();
 const esc=s=>(s||'').replace(/</g,'&lt;');
 function showToast(msg,dur=2500){const t=$('toast-el');t.textContent=msg;t.style.opacity='1';clearTimeout(t._tmr);t._tmr=setTimeout(()=>t.style.opacity='0',dur);}
-const AI_BREVITY='결론과 핵심 위주로 간결하게 답하되, 시작한 문장과 항목은 반드시 끝까지 완결해줘. 중간에 잘리지 않도록 분량을 스스로 조절해.';
+const AI_BREVITY='답변 규칙: 1. 핵심 위주 간략 답변 (서술형 금지) 2. 텍스트 형태로 작성 3. 가독성 좋게 표현 4. #,*,-,가나다 순서 기호 금지, 항목은 1.2.3.4. 숫자 순으로, 항목 사이 과도한 줄바꿈 없이 작성 5. 시작한 문장과 항목은 반드시 끝까지 완결, 중간에 잘리지 않도록 분량 스스로 조절.';
 async function callAI(sys,usr,max=1000,allowCont=false){
  const msgs=Array.isArray(usr)?usr.slice():[{role:'user',content:usr}];
  const maxRounds=(allowCont&&S.aiSettings&&S.aiSettings.autocont)?3:1;
@@ -608,7 +608,7 @@ function genWeekReport(ws,we){
  const evs=[];for(let d=new Date(ws);d<=new Date(we);d.setDate(d.getDate()+1))evs.push(...getEventsForDate(fmtDate(d)));
  showConfirmModal(`<p style="font-size:12px;margin-bottom:8px">📋 <b>${ws}~${we}</b> 주간보고 초안을 생성할까요?</p>`,async()=>{
   loadingModal('주간보고 생성 중...');
-  try{const text=await callAI('KTIS 콜센터 PM 강성호 업무 도우미.',`기간: ${ws}~${we}\n일정:\n${evs.map(e=>`- [${e.status||'진행'}] ${e.date} ${e.title}`).join('\n')}\n\nKTIS PM 주간보고 작성해줘.`,2000,true)||'오류';
+  try{const text=await callAI('KTIS 콜센터 PM 강성호 업무 도우미. '+AI_BREVITY,`기간: ${ws}~${we}\n일정:\n${evs.map(e=>`- [${e.status||'진행'}] ${e.date} ${e.title}`).join('\n')}\n\nKTIS PM 주간보고 작성해줘.`,2000,true)||'오류';
    draftModal('주간보고 초안',text);}catch(e){closeModal();}
  },'생성');}
 function renderDailyView(c){
@@ -632,7 +632,7 @@ function genDailyReport(ds){
  const evs=getEventsForDate(ds),dow=new Date(ds).getDay();
  showConfirmModal(`<p style="font-size:12px;margin-bottom:8px">📋 <b>${ds}</b> 일일보고 초안을 생성할까요?</p>`,async()=>{
   loadingModal('일일보고 생성 중...');
-  try{const text=await callAI('KTIS 콜센터 PM 강성호 업무 도우미.',`날짜:${ds}(${DK[dow]})\n일정:\n${evs.map(e=>`- [${e.status==='done'?'완료':'진행'}] ${e.title}${e.memo?' ('+e.memo+')':''}`).join('\n')||'없음'}\n\nKTIS PM 일일보고 초안 작성해줘.`,1500,true)||'오류';
+  try{const text=await callAI('KTIS 콜센터 PM 강성호 업무 도우미. '+AI_BREVITY,`날짜:${ds}(${DK[dow]})\n일정:\n${evs.map(e=>`- [${e.status==='done'?'완료':'진행'}] ${e.title}${e.memo?' ('+e.memo+')':''}`).join('\n')||'없음'}\n\nKTIS PM 일일보고 초안 작성해줘.`,1500,true)||'오류';
    draftModal(`일일보고 초안 (${ds})`,text,`<button class="btn-g" onclick="saveDraftAsDailyReport('${ds}')">보고 저장</button>`);}catch(e){closeModal();}
  },'생성');}
 function saveDraftAsDailyReport(ds){const el=$('dbx');if(!el)return;upsertDaily(ds,el.dataset.raw?decodeURIComponent(el.dataset.raw):el.textContent);closeModal();render();showToast('일일보고가 저장됐습니다.');}
@@ -989,7 +989,7 @@ async function genWeeklyFromDaily(mon,fri,week){
  const reps=S.dailyReports.filter(r=>r.date>=mon&&r.date<=fri).sort((a,b)=>a.date.localeCompare(b.date));
  if(!reps.length){showToast(S.dailyReports.length?'이번 주 일일보고가 없습니다.':'저장된 일일보고가 없습니다.');return;}
  loadingModal('주간보고 초안 생성 중...');
- try{const text=await callAI('KTIS 콜센터 PM 강성호 업무 도우미.',`기간:${week}\n\n이번 주 일일보고:\n\n${reps.map(r=>`[${r.date}]\n${r.content}`).join('\n\n')}\n\n위 일일보고를 바탕으로 KTIS PM 주간보고 초안을 작성해줘.`,2000,true)||'오류';
+ try{const text=await callAI('KTIS 콜센터 PM 강성호 업무 도우미. '+AI_BREVITY,`기간:${week}\n\n이번 주 일일보고:\n\n${reps.map(r=>`[${r.date}]\n${r.content}`).join('\n\n')}\n\n위 일일보고를 바탕으로 KTIS PM 주간보고 초안을 작성해줘.`,2000,true)||'오류';
   draftModal('주간보고 초안 (일일보고 기반)',text,`<button class="btn-g" onclick="applyDraftToWeekly('${week}')">주간보고로 저장</button>`);
  }catch(e){closeModal();showToast('오류');}}
 function applyDraftToWeekly(week){const el=$('dbx');if(!el)return;upsertWeekly(week,el.dataset.raw?decodeURIComponent(el.dataset.raw):el.textContent);closeModal();rerenderWR();showToast('저장됐습니다.');}
@@ -1016,7 +1016,7 @@ ${urgent.length?`<div style="font-size:10px;font-weight:700;color:#888;margin-bo
 <div style="font-size:10px;font-weight:700;color:#888;margin-bottom:5px">🤖 오늘의 우선순위 분석</div>
 <div id="ai-brief-result" class="ai-priority"><div class="loading"><div class="spin"></div>AI 분석 중...</div></div>
 <div class="mactions" style="margin-top:12px"><button class="btn-p" onclick="closeModal()">✅ 확인 완료</button></div></div>`);
- try{const text=await callAI('KTIS 콜센터 PM 강성호 업무 도우미.',`오늘(${ds}) 일정:\n${evs.map(e=>`- ${evLabel(e)}`).join('\n')||'없음'}\n이번주 중요:\n${urgent.slice(0,5).map(e=>`- ${e.date.slice(5)} ${e.title}`).join('\n')||'없음'}\n\nKTIS PM 우선순위 3가지 간결하게.`,500);
+ try{const text=await callAI('KTIS 콜센터 PM 강성호 업무 도우미. '+AI_BREVITY,`오늘(${ds}) 일정:\n${evs.map(e=>`- ${evLabel(e)}`).join('\n')||'없음'}\n이번주 중요:\n${urgent.slice(0,5).map(e=>`- ${e.date.slice(5)} ${e.title}`).join('\n')||'없음'}\n\nKTIS PM 우선순위 3가지 간결하게.`,500);
   const el=$('ai-brief-result');if(el)el.textContent=text||'분석 완료';}
  catch(e){const el=$('ai-brief-result');if(el)el.textContent='AI 분석 불가';}}
 
