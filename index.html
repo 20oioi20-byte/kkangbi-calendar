@@ -3951,6 +3951,11 @@ const expandedMid=new Set(S.pl.uiState.expandedMid);
 const ym=detailCompareYm&&allYMs.includes(detailCompareYm)?detailCompareYm:allYMs[allYMs.length-1];
 const recByCenter={};
 centers.forEach(c=>{recByCenter[c.id]=aggRecord(ym,c.id);});
+function catVal(rec,cat){
+if(!rec)return null;
+if(cat.mode==='field')return rec[cat.key]??0;
+return categoryTotal(rec,cat.key,accIdx);
+}
 const cats=[
 {key:'revenue',label:'매출',mode:'field'},
 {key:'직접인건비',label:'직접인건비',mode:'cat'},
