@@ -3728,6 +3728,12 @@ return`<div style="display:flex;gap:4px;flex-shrink:0">
 <button class="btn-o" style="font-size:9px;padding:4px 8px" onclick="exportTablePDF()">🖨️ PDF(인쇄)</button>
 </div>`;
 }
+// ── 전역 catVal (세부분석/센터비교 공용) ──
+function catVal(rec,cat,accIdx){
+if(!rec)return null;
+if(cat.mode==='field')return rec[cat.key]??0;
+return categoryTotal(rec,cat.key,accIdx||{});
+}
 function plDetailHtmlInner(){
 ensureUiState();
 const _detailAllYMs=getAllYMs();
@@ -3758,11 +3764,6 @@ const cats=[
 {key:'hqProfit',label:'본부이익',mode:'field'},
 {key:'totalProfit',label:'전사이익',mode:'field'},
 ];
-function catVal(rec,cat){
-if(!rec)return null;
-if(cat.mode==='field')return rec[cat.key]??0;
-return categoryTotal(rec,cat.key,accIdx);
-}
 const recordsByYm={};
 yearMonths.forEach(m=>{recordsByYm[m]=allYMs.includes(m)?aggRecord(m,scope):null;});
 const lastYm=allYMs[allYMs.length-1];
@@ -3776,7 +3777,7 @@ return{next};
 }
 function annualForecast(cat){
 const actualMonths=yearMonths.filter(m=>allYMs.includes(m));
-const actualSum=actualMonths.reduce((s,m)=>s+(catVal(recordsByYm[m],cat)||0),0);
+const actualSum=actualMonths.reduce((s,m)=>s+(catVal(recordsByYm[m],cat,accIdx)||0),0);
 const remaining=12-actualMonths.length;
 const next=predictFor(cat).next;
 return{value:actualSum+next*remaining,actualCount:actualMonths.length,remaining};
@@ -3846,7 +3847,7 @@ return`<th style="padding:5px 6px;text-align:right;border-bottom:1px solid #e0e0
 <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #e0e0e0;background:#f0f4ff">월평균</th>
 </tr></thead><tbody>`;
 cats.forEach(cat=>{
-const vals={};yearMonths.forEach(m=>{vals[m]=catVal(recordsByYm[m],cat);});
+const vals={};yearMonths.forEach(m=>{vals[m]=catVal(recordsByYm[m],cat,accIdx);});
 const{sum,avg}=sumAvg(vals);
 const isExp=cat.mode==='cat'&&expandedCats.has(cat.key);
 const isProfit=cat.key==='centerProfit'||cat.key==='hqProfit'||cat.key==='totalProfit';
@@ -3951,11 +3952,6 @@ const expandedMid=new Set(S.pl.uiState.expandedMid);
 const ym=detailCompareYm&&allYMs.includes(detailCompareYm)?detailCompareYm:allYMs[allYMs.length-1];
 const recByCenter={};
 centers.forEach(c=>{recByCenter[c.id]=aggRecord(ym,c.id);});
-function catVal(rec,cat){
-if(!rec)return null;
-if(cat.mode==='field')return rec[cat.key]??0;
-return categoryTotal(rec,cat.key,accIdx);
-}
 const cats=[
 {key:'revenue',label:'매출',mode:'field'},
 {key:'직접인건비',label:'직접인건비',mode:'cat'},
@@ -3993,7 +3989,7 @@ ${centers.map(c=>`<th style="padding:5px 6px;text-align:right;border-bottom:1px 
 <th style="padding:5px 6px;text-align:right;border-bottom:1px solid #e0e0e0;background:#f0f4ff">합계</th>
 </tr></thead><tbody>`;
 cats.forEach(cat=>{
-const vals={};centers.forEach(c=>{vals[c.id]=catVal(recByCenter[c.id],cat);});
+const vals={};centers.forEach(c=>{vals[c.id]=catVal(recByCenter[c.id],cat,accIdx);});
 const present=centers.map(c=>vals[c.id]).filter(v=>v!=null);
 const sum=present.length?present.reduce((s,v)=>s+v,0):null;
 const isExp=cat.mode==='cat'&&expandedCats.has(cat.key);
