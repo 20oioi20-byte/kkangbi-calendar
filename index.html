@@ -1425,20 +1425,19 @@ const periodLabel=mode==='cumulative'?`${thisYM.slice(0,4)}-01~${thisYM} 누적`
 const months=getLast6Months();
 let html='';
 const ymOpts=allYMs.map(m=>`<option value="${m}" ${m===thisYM?'selected':''}>${m}</option>`).join('');
+const dashYmIdx=allYMs.indexOf(thisYM);
+const dashPrevYm=allYMs[dashYmIdx-1]||allYMs[0];
+const dashNextYm=allYMs[dashYmIdx+1]||allYMs[allYMs.length-1];
 html+=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+<button class="btn-o" style="font-size:13px;padding:5px 9px;line-height:1" title="이전 월" onclick="setDashYm('${dashPrevYm}')">◀</button>
 <select onchange="setDashYm(this.value)" class="pl-inp">${ymOpts||`<option>${thisYM}</option>`}</select>
+<button class="btn-o" style="font-size:13px;padding:5px 9px;line-height:1" title="다음 월" onclick="setDashYm('${dashNextYm}')">▶</button>
 <div style="display:flex;border:1px solid #ddd;border-radius:6px;overflow:hidden">
 <button onclick="setDashMode('single')" style="padding:6px 12px;border:none;background:${mode==='single'?'#1a73e8':'#fff'};color:${mode==='single'?'#fff':'#666'};font-size:11px;font-weight:600;cursor:pointer">단월</button>
 <button onclick="setDashMode('cumulative')" style="padding:6px 12px;border:none;background:${mode==='cumulative'?'#1a73e8':'#fff'};color:${mode==='cumulative'?'#fff':'#666'};font-size:11px;font-weight:600;cursor:pointer">연초누적</button>
 </div>
 <span style="font-size:9px;color:#aaa">${mode==='cumulative'?'연초(1월)~선택월 합산':'선택월 한 달'}</span>
 </div>`;
-const lockedCount=getAllLockedCells().length;
-if(lockedCount){
-html+=`<div class="scard"><div style="display:flex;gap:8px;flex-wrap:wrap">
-<div style="flex:1;min-width:120px;cursor:pointer;background:#eef2fc;border-radius:7px;padding:8px 10px" onclick="switchPLTab('locked')"><div style="font-size:16px;font-weight:700;color:#1a73e8">${lockedCount}건</div><div style="font-size:9px;color:#888">🔒 확정(잠금)된 항목</div></div>
-</div></div>`;
-}
 const totals={};
 const isSel=ctr=>(dashSelectedCenters===null)||dashSelectedCenters.includes(ctr.id);
 PL_FIELDS.forEach(f=>{
@@ -3485,6 +3484,21 @@ if(!rec){alert('해당 월에 저장된 데이터가 없습니다.');return;}
 rec.monthLocked=!rec.monthLocked;
 await savePL();renderPLTabContent();
 }
+async function lockAllMonths(year,lock){
+// 해당 연도 전체 센터 전체 월 일괄 확정/해제
+const centers=getActiveCenters(true);
+const yms=Array.from({length:12},(_,i)=>`${year}-${String(i+1).padStart(2,'0')}`);
+let changed=0;
+centers.forEach(c=>{
+yms.forEach(ym=>{
+const rec=(S.pl.records[c.id]||{})[ym];
+if(rec){rec.monthLocked=lock;changed++;}
+});
+});
+if(!changed){alert('확정할 데이터가 없습니다.');return;}
+await savePL();renderPLTabContent();
+showToast(`${year}년 전체 ${lock?'확정':'확정 해제'} 완료 (${changed}건)`);
+}
 function openMonthVisibilitySettings(year){
 ensureUiState();
 const months=Array.from({length:12},(_,i)=>`${year}-${String(i+1).padStart(2,'0')}`);
@@ -3735,6 +3749,9 @@ years.sort();
 const year=detailViewYear||allYMs[allYMs.length-1].slice(0,4);
 const yearMonths=Array.from({length:12},(_,i)=>`${year}-${String(i+1).padStart(2,'0')}`);
 const visYMs=yearMonths.filter(m=>!hidden.has(m));
+// recByCenter 선언 (catVal, lockOf 등에서 사용)
+const recByCenter={};
+centers.forEach(c=>{recByCenter[c.id]=aggRecord(ym,c.id);});
 const cats=[
 {key:'revenue',label:'매출',mode:'field'},
 {key:'직접인건비',label:'직접인건비',mode:'cat'},
@@ -3817,7 +3834,7 @@ if(!present.length)return{sum:null,avg:null};
 const sum=present.reduce((s,v)=>s+v,0);
 return{sum,avg:sum/present.length};
 }
-html+=`<div class="scard" id="pl-export-area"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><h4 style="margin:0">📅 ${year}년 월별 상세 ${scope==='__all__'?'(전체 합산)':`(${escAttr((centers.find(c=>c.id===scope)||{}).name||'')})`}</h4>${exportButtonsHtml()}</div>
+html+=`<div class="scard" id="pl-export-area"><div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px"><h4 style="margin:0">📅 ${year}년 월별 상세 ${scope==='__all__'?'(전체 합산)':`(${escAttr((centers.find(c=>c.id===scope)||{}).name||'')})`}</h4><button class="btn-o" style="font-size:10px;padding:4px 10px;margin-left:auto" onclick="lockAllMonths('${year}',true)">🔒 ${year}년 전체 확정</button><button class="btn-o" style="font-size:10px;padding:4px 10px" onclick="lockAllMonths('${year}',false)">🔓 전체 해제</button>${exportButtonsHtml()}</div>
 <div style="font-size:9px;color:#aaa;margin:6px 0">경비/인건비 행을 클릭하면 중분류(예: 임차료)가 펼쳐지고, 중분류를 다시 클릭하면 최종 세부항목(예: 건물임차료)이 펼쳐집니다. 전월 대비 금액 차이: <span style="color:#d32f2f;font-weight:700">▲ 빨강=증가</span> / <span style="color:#1a73e8;font-weight:700">▼ 파랑=감소</span>, ⭐는 1억 이상 급변입니다. ${editable?'각 월 머리의 🔓/🔒 버튼으로 그 달 전체를 확정·해제할 수 있고, 확정하면 파일을 다시 올려도 그 달 데이터는 유지됩니다. 금액을 더블클릭하면 개별 수정도 가능합니다.':'센터를 선택하면 월별 확정 및 금액 수정이 가능합니다.'} (Raw CSV로 업로드한 달만 세부 내역 제공)</div>
 <div style="overflow-x:auto"><table class="pl-tbl">
 <thead><tr style="background:#f8f9fa">
@@ -3935,6 +3952,9 @@ const accIdx=buildAccMapIndexFull();
 const expandedCats=new Set(S.pl.uiState.expandedCats);
 const expandedMid=new Set(S.pl.uiState.expandedMid);
 const ym=detailCompareYm&&allYMs.includes(detailCompareYm)?detailCompareYm:allYMs[allYMs.length-1];
+// recByCenter 선언 (catVal, lockOf 등에서 사용)
+const recByCenter={};
+centers.forEach(c=>{recByCenter[c.id]=aggRecord(ym,c.id);});
 const cats=[
 {key:'revenue',label:'매출',mode:'field'},
 {key:'직접인건비',label:'직접인건비',mode:'cat'},
