@@ -3728,11 +3728,16 @@ return`<div style="display:flex;gap:4px;flex-shrink:0">
 <button class="btn-o" style="font-size:9px;padding:4px 8px" onclick="exportTablePDF()">🖨️ PDF(인쇄)</button>
 </div>`;
 }
-// ── 전역 catVal (세부분석/센터비교 공용) ──
+// ── 전역 공용 함수 (세부분석/센터비교 공용) ──
 function catVal(rec,cat,accIdx){
 if(!rec)return null;
 if(cat.mode==='field')return rec[cat.key]??0;
 return categoryTotal(rec,cat.key,accIdx||{});
+}
+function lockOf(rec,kind,key){
+if(!rec||!rec.locks)return false;
+if(kind==='field')return!!rec.locks[key];
+return!!(rec.locks.items&&rec.locks.items[key]);
 }
 function plDetailHtmlInner(){
 ensureUiState();
@@ -3809,11 +3814,6 @@ let html=`<div style="display:flex;justify-content:space-between;align-items:cen
 <button class="btn-o" style="font-size:10px;padding:5px 10px" onclick="openMonthVisibilitySettings('${year}')">📅 월 표시 설정${hidden.size?` (숨김 ${hidden.size})`:''}</button>
 </div>`;
 if(!editable)html+=`<div style="font-size:10px;color:#1a73e8;background:#e8f0fe;border-radius:6px;padding:6px 10px;margin-bottom:8px">💡 센터를 선택하면 금액을 더블클릭해 직접 수정하고 확정(잠금)할 수 있습니다.</div>`;
-function lockOf(rec,kind,key){
-if(!rec||!rec.locks)return false;
-if(kind==='field')return!!rec.locks[key];
-return!!(rec.locks.items&&rec.locks.items[key]);
-}
 function cellHtml(v,momP,bold,opts){
 opts=opts||{};
 const lockIcon=opts.locked?` <span style="font-size:8px" title="확정됨 - 다른 파일을 업로드해도 바뀌지 않습니다">🔒</span>`:'';
